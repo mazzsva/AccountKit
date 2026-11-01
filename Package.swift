@@ -24,6 +24,7 @@ let package = Package(
         .package(url: "https://github.com/pointfreeco/swift-case-paths", from: "1.10.0"),
         .package(url: "https://github.com/pointfreeco/swift-custom-dump", from: "1.7.3"),
         .package(url: "https://github.com/pointfreeco/swift-dependencies", from: "1.17.1"),
+        .package(url: "https://github.com/firebase/firebase-ios-sdk", "12.15.0" ..< "13.0.0"),
     ],
     targets: [
         // Targets are the basic building blocks of a package, defining a module or a test suite.
@@ -34,6 +35,7 @@ let package = Package(
                 .product(name: "CasePaths", package: "swift-case-paths"),
                 .product(name: "Dependencies", package: "swift-dependencies"),
                 .product(name: "DependenciesMacros", package: "swift-dependencies"),
+                .product(name: "FirebaseAuth", package: "firebase-ios-sdk"),
             ],
             swiftSettings: swiftSettings,
         ),
