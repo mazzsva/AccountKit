@@ -25,6 +25,7 @@ let package = Package(
         .package(url: "https://github.com/pointfreeco/swift-concurrency-extras", from: "1.4.3"),
         .package(url: "https://github.com/pointfreeco/swift-custom-dump", from: "1.7.3"),
         .package(url: "https://github.com/pointfreeco/swift-dependencies", from: "1.17.1"),
+        .package(url: "https://github.com/pointfreeco/swift-issue-reporting", from: "2.1.2"),
         .package(url: "https://github.com/firebase/firebase-ios-sdk", "12.15.0" ..< "13.0.0"),
     ],
     targets: [
@@ -38,6 +39,7 @@ let package = Package(
                 .product(name: "DependenciesMacros", package: "swift-dependencies"),
                 .product(name: "FirebaseAuth", package: "firebase-ios-sdk"),
                 .product(name: "FirebaseFirestore", package: "firebase-ios-sdk"),
+                .product(name: "IssueReporting", package: "swift-issue-reporting"),
             ],
             swiftSettings: swiftSettings,
         ),
