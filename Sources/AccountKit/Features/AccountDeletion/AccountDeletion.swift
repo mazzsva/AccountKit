@@ -20,6 +20,7 @@ public struct AccountDeletion: Sendable {
         case credentialRevoked
         case deleting
         case reauthenticating
+        case revokingCredential
         case userDataDeleted
     }
 
@@ -38,6 +39,7 @@ public struct AccountDeletion: Sendable {
         case accountDeleted
         case appleCredentialReceived(AppleCredential)
         case appleCredentialRevoked
+        case appleCredentialRevokeStarted
         case delegate(Delegate)
         case deletionConfirmed
         case deletionFailed(any Error)
@@ -88,6 +90,10 @@ public struct AccountDeletion: Sendable {
                 state.step = .credentialRevoked
                 return .none
 
+            case .appleCredentialRevokeStarted:
+                state.step = .revokingCredential
+                return .none
+
             case .delegate:
                 return .none
 
@@ -118,6 +124,8 @@ public struct AccountDeletion: Sendable {
             try Task.checkCancellation()
             try await userDataClient.deleteAll(uid) { await send(.userDataDeleted) }
             try Task.checkCancellation()
+            await send(.appleCredentialRevokeStarted)
+            try Task.checkCancellation()
             try await authClient.revokeAppleToken(authorizationCode: authorizationCode)
             await send(.appleCredentialRevoked)
             try Task.checkCancellation()
@@ -129,7 +137,8 @@ public struct AccountDeletion: Sendable {
     }
 
     private func fail(_ state: inout State, error: any Error) -> Effect<Action> {
-        guard state.step != .credentialRevoked else {
+        let isTimedOut = (error as? DeletionError) == .timedOut
+        guard state.step != .credentialRevoked, state.step != .revokingCredential || !isTimedOut else {
             logger.error("Account deletion failed after the revoke; signing out: \(error, privacy: .public)")
             return .merge(
                 .cancel(id: CancelID.deletion),
@@ -145,11 +154,11 @@ public struct AccountDeletion: Sendable {
             return .merge(.cancel(id: CancelID.deletion), .send(.delegate(.didCancel)))
         }
         logger.error("Account deletion failed: \(error, privacy: .public)")
-        let isConnectionFailure = (error as? DeletionError) == .timedOut || error.isAuthNetworkError
+        let isConnectionFailure = isTimedOut || error.isAuthNetworkError
         let failure: Failure =
             switch state.step {
             case .deleting where isConnectionFailure: .connectionFailed
-            case .userDataDeleted: .notFullyDeleted
+            case .revokingCredential, .userDataDeleted: .notFullyDeleted
             case .credentialRevoked, .deleting, .reauthenticating: .notDeleted
             }
         return .merge(
