@@ -1,4 +1,5 @@
 import AccountKitTestSupport
+import ConcurrencyExtras
 import CustomDump
 import FirebaseFirestore
 import Foundation
@@ -43,6 +44,53 @@ extension BaseSuite.IntegrationSuite {
         }
 
         @Test
+        func deletingAllReportsTheFirstPageOnceBeforeTheLastPage() async throws {
+            let uid = try await newUID()
+            try await add(501, to: "items", uid: uid)
+            let remainingAtReports = LockIsolated<[Int?]>([])
+
+            try await AccountStorage.shared.deleteAll(in: "items", uid: uid) {
+                let remaining = try? await count("items", uid: uid)
+                remainingAtReports.withValue { $0.append(remaining) }
+            }
+
+            let items = try await count("items", uid: uid)
+            expectNoDifference(remainingAtReports.value, [1])
+            expectNoDifference(items, 0)
+        }
+
+        @Test
+        func deletingAllInAnEmptyCollectionReportsOnceAtTheEnd() async throws {
+            let uid = try await newUID()
+            let reports = LockIsolated(0)
+
+            try await AccountStorage.shared.deleteAll(in: "items", uid: uid) {
+                reports.withValue { $0 += 1 }
+            }
+
+            expectNoDifference(reports.value, 1)
+        }
+
+        @Test
+        func aFailureAfterTheFirstPageHasAlreadyReportedIt() async throws {
+            let uid = try await newUID()
+            try await add(501, to: "items", uid: uid)
+            let reports = LockIsolated(0)
+
+            let deletion = Task {
+                try await AccountStorage.shared.deleteAll(in: "items", uid: uid) {
+                    reports.withValue { $0 += 1 }
+                    withUnsafeCurrentTask { $0?.cancel() }
+                }
+            }
+
+            await #expect(throws: CancellationError.self) { try await deletion.value }
+            let items = try await count("items", uid: uid)
+            expectNoDifference(reports.value, 1)
+            expectNoDifference(items, 1)
+        }
+
+        @Test
         func aCanceledDeleteKeepsTheDocuments() async throws {
             let uid = try await newUID()
             try await add(2, to: "items", uid: uid)
@@ -65,6 +113,19 @@ extension BaseSuite.IntegrationSuite {
                 try await AccountStorage.shared.deleteAll(in: "items", uid: lockedUID)
             }
             expectNoDifference(error?.code, FirestoreErrorCode.permissionDenied.rawValue)
+        }
+
+        @Test
+        func aRefusedReadReportsNothing() async throws {
+            try await FirebaseEmulators.clearLocalData()
+            let reports = LockIsolated(0)
+
+            await #expect(throws: NSError.self) {
+                try await AccountStorage.shared.deleteAll(in: "items", uid: lockedUID) {
+                    reports.withValue { $0 += 1 }
+                }
+            }
+            expectNoDifference(reports.value, 0)
         }
 
         private func add(_ count: Int, to collection: String, uid: String) async throws {

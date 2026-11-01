@@ -26,17 +26,31 @@ public actor AccountStorage {
         try await clearing.value
     }
 
-    public func deleteAll(in collection: String, uid: String) async throws {
+    public func deleteAll(
+        in collection: String,
+        uid: String,
+        didDeleteSomeData: @Sendable () async -> Void = {}
+    ) async throws {
         await waitForClearing()
+        var hasDeletedSomeData = false
         while true {
             try Task.checkCancellation()
             let snapshot = try await Self.collection(collection, uid: uid).limit(to: 500).getDocuments()
-            guard !snapshot.documents.isEmpty else { return }
+            guard !snapshot.documents.isEmpty else {
+                if !hasDeletedSomeData {
+                    await didDeleteSomeData()
+                }
+                return
+            }
             let batch = Firestore.firestore().batch()
             for document in snapshot.documents {
                 batch.deleteDocument(document.reference)
             }
             try await batch.commit()
+            if !hasDeletedSomeData {
+                hasDeletedSomeData = true
+                await didDeleteSomeData()
+            }
         }
     }
 
