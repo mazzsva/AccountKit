@@ -26,6 +26,20 @@ public actor AccountStorage {
         try await clearing.value
     }
 
+    public func deleteAll(in collection: String, uid: String) async throws {
+        await waitForClearing()
+        while true {
+            try Task.checkCancellation()
+            let snapshot = try await Self.collection(collection, uid: uid).limit(to: 500).getDocuments()
+            guard !snapshot.documents.isEmpty else { return }
+            let batch = Firestore.firestore().batch()
+            for document in snapshot.documents {
+                batch.deleteDocument(document.reference)
+            }
+            try await batch.commit()
+        }
+    }
+
     public func perform<Result: Sendable>(
         _ operation: @Sendable (isolated AccountStorage) async throws -> Result
     ) async rethrows -> Result {
@@ -35,5 +49,15 @@ public actor AccountStorage {
 
     public func waitForClearing() async {
         _ = try? await clearing?.value
+    }
+}
+
+extension AccountStorage {
+    public static func collection(_ name: String, uid: String) -> CollectionReference {
+        Firestore.firestore().collection("users").document(uid).collection(name)
+    }
+
+    public static func profileDocument(uid: String) -> DocumentReference {
+        Firestore.firestore().collection("users").document(uid)
     }
 }
