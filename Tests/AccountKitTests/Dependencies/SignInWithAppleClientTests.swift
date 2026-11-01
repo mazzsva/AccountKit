@@ -17,6 +17,33 @@ extension BaseSuite {
             #expect(!URLError(.cancelled).isSignInWithAppleCancellation)
         }
 
+        @Test(
+            arguments: [
+                (ASAuthorizationAppleIDProvider.CredentialState.authorized, AppleCredentialState.authorized),
+                (.notFound, .notFound),
+                (.revoked, .revoked),
+                (.transferred, .transferred),
+            ]
+        )
+        func eachCredentialStateWithoutAnErrorKeepsItsCase(
+            state: ASAuthorizationAppleIDProvider.CredentialState,
+            expected: AppleCredentialState
+        ) {
+            expectNoDifference(appleCredentialState(from: state, error: nil), expected)
+        }
+
+        @Test(
+            arguments: [
+                ASAuthorizationAppleIDProvider.CredentialState.authorized,
+                .notFound,
+                .revoked,
+                .transferred,
+            ]
+        )
+        func aCredentialStateWithAnErrorIsUnknown(state: ASAuthorizationAppleIDProvider.CredentialState) {
+            expectNoDifference(appleCredentialState(from: state, error: ASAuthorizationError(.failed)), .unknown)
+        }
+
         @Test
         func theNonceIs64LowercaseHexadecimalCharacters() {
             let nonce = randomNonce()

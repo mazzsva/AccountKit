@@ -39,18 +39,7 @@ extension SignInWithAppleClient: DependencyKey {
                                 logger.error(
                                     "Reading the Apple ID credential state failed: \(error, privacy: .public)")
                             }
-                            switch state {
-                            case .authorized:
-                                continuation.resume(returning: .authorized)
-                            case .notFound:
-                                continuation.resume(returning: .notFound)
-                            case .revoked:
-                                continuation.resume(returning: .revoked)
-                            case .transferred:
-                                continuation.resume(returning: .transferred)
-                            @unknown default:
-                                continuation.resume(returning: .unknown)
-                            }
+                            continuation.resume(returning: appleCredentialState(from: state, error: error))
                         }
                 }
             },
@@ -97,6 +86,25 @@ extension DependencyValues {
 extension Error {
     var isSignInWithAppleCancellation: Bool {
         (self as? ASAuthorizationError)?.code == .canceled
+    }
+}
+
+func appleCredentialState(
+    from state: ASAuthorizationAppleIDProvider.CredentialState,
+    error: (any Error)?
+) -> AppleCredentialState {
+    guard error == nil else { return .unknown }
+    switch state {
+    case .authorized:
+        return .authorized
+    case .notFound:
+        return .notFound
+    case .revoked:
+        return .revoked
+    case .transferred:
+        return .transferred
+    @unknown default:
+        return .unknown
     }
 }
 
