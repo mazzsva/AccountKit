@@ -26,6 +26,7 @@ let package = Package(
     ],
     dependencies: [
         .package(url: "https://github.com/pointfreeco/swift-case-paths", from: "1.10.0"),
+        .package(url: "https://github.com/pointfreeco/swift-composable-architecture", from: "1.26.2"),
         .package(url: "https://github.com/pointfreeco/swift-concurrency-extras", from: "1.4.3"),
         .package(url: "https://github.com/pointfreeco/swift-custom-dump", from: "1.7.3"),
         .package(url: "https://github.com/pointfreeco/swift-dependencies", from: "1.17.1"),
@@ -39,6 +40,7 @@ let package = Package(
             name: "AccountKit",
             dependencies: [
                 .product(name: "CasePaths", package: "swift-case-paths"),
+                .product(name: "ComposableArchitecture", package: "swift-composable-architecture"),
                 .product(name: "ConcurrencyExtras", package: "swift-concurrency-extras"),
                 .product(name: "Dependencies", package: "swift-dependencies"),
                 .product(name: "DependenciesMacros", package: "swift-dependencies"),
@@ -65,6 +67,7 @@ let package = Package(
             dependencies: [
                 "AccountKit",
                 "AccountKitTestSupport",
+                .product(name: "ComposableArchitecture", package: "swift-composable-architecture"),
                 .product(name: "ConcurrencyExtras", package: "swift-concurrency-extras"),
                 .product(name: "CustomDump", package: "swift-custom-dump"),
                 .product(name: "DependenciesTestSupport", package: "swift-dependencies"),
