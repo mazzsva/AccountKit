@@ -38,6 +38,9 @@ extension BaseSuite {
             await store.receive(\.userDataDeleted) {
                 $0.step = .userDataDeleted
             }
+            await store.receive(\.appleCredentialRevokeStarted) {
+                $0.step = .revokingCredential
+            }
             await store.receive(\.appleCredentialRevoked) {
                 $0.step = .credentialRevoked
             }
@@ -226,6 +229,9 @@ extension BaseSuite {
             await store.receive(\.userDataDeleted) {
                 $0.step = .userDataDeleted
             }
+            await store.receive(\.appleCredentialRevokeStarted) {
+                $0.step = .revokingCredential
+            }
             await store.receive(\.deletionFailed)
             await store.receive(\.delegate.didFail, .notFullyDeleted)
             await store.finish()
@@ -250,6 +256,9 @@ extension BaseSuite {
             }
             await store.receive(\.userDataDeleted) {
                 $0.step = .userDataDeleted
+            }
+            await store.receive(\.appleCredentialRevokeStarted) {
+                $0.step = .revokingCredential
             }
             await store.receive(\.deletionFailed)
             await store.receive(\.delegate.didFail, .notFullyDeleted)
@@ -279,6 +288,9 @@ extension BaseSuite {
                 }
                 await store.receive(\.userDataDeleted) {
                     $0.step = .userDataDeleted
+                }
+                await store.receive(\.appleCredentialRevokeStarted) {
+                    $0.step = .revokingCredential
                 }
                 await store.receive(\.appleCredentialRevoked) {
                     $0.step = .credentialRevoked
@@ -312,6 +324,9 @@ extension BaseSuite {
             await store.receive(\.userDataDeleted) {
                 $0.step = .userDataDeleted
             }
+            await store.receive(\.appleCredentialRevokeStarted) {
+                $0.step = .revokingCredential
+            }
             await store.receive(\.appleCredentialRevoked) {
                 $0.step = .credentialRevoked
             }
@@ -327,7 +342,6 @@ extension BaseSuite {
                 (.reauthenticate, .connectionFailed),
                 (.deleteAll, .connectionFailed),
                 (.deleteAllAfterTheFirstDeletion, .notFullyDeleted),
-                (.revokeAppleToken, .notFullyDeleted),
             ] as [(StalledStep, AccountDeletion.Failure)]
         )
         func aStalledDeletionTimesOutAfterOneMinute(
@@ -360,10 +374,6 @@ extension BaseSuite {
                         await didDeleteSomeData()
                         await stall()
                     }
-                case .revokeAppleToken:
-                    $0.authClient.reauthenticate = { _ in }
-                    $0.authClient.revokeAppleToken = { _ in await stall() }
-                    $0.userDataClient.deleteAll = { _, didDeleteSomeData in await didDeleteSomeData() }
                 }
             }
 
@@ -417,6 +427,9 @@ extension BaseSuite {
                 await store.receive(\.userDataDeleted) {
                     $0.step = .userDataDeleted
                 }
+                await store.receive(\.appleCredentialRevokeStarted) {
+                    $0.step = .revokingCredential
+                }
                 await store.receive(\.appleCredentialRevoked) {
                     $0.step = .credentialRevoked
                 }
@@ -430,11 +443,117 @@ extension BaseSuite {
             }
         }
 
+        @Test
+        func aStalledRevokeSignsTheUserOut() async {
+            let clock = TestClock()
+            let isStallCanceled = LockIsolated(false)
+            let stall: @Sendable () async -> Void = {
+                await withTaskCancellationHandler {
+                    _ = await Task { try? await clock.sleep(for: .seconds(3600)) }.value
+                } onCancel: {
+                    isStallCanceled.setValue(true)
+                }
+            }
+            await confirmation("Signs the user out") { signsOut in
+                let store = TestStore(initialState: AccountDeletion.State(uid: AccountUser.mock.uid)) {
+                    AccountDeletion()
+                } withDependencies: {
+                    $0.authClient.reauthenticate = { _ in }
+                    $0.authClient.revokeAppleToken = { _ in await stall() }
+                    $0.authClient.signOut = { signsOut() }
+                    $0.continuousClock = clock
+                    $0.signInWithAppleClient.requestCredential = { .mock }
+                    $0.userDataClient.deleteAll = { _, didDeleteSomeData in await didDeleteSomeData() }
+                }
+
+                await store.send(.deletionConfirmed)
+                await store.receive(\.appleCredentialReceived) {
+                    $0.step = .deleting
+                }
+                await store.receive(\.userDataDeleted) {
+                    $0.step = .userDataDeleted
+                }
+                await store.receive(\.appleCredentialRevokeStarted) {
+                    $0.step = .revokingCredential
+                }
+                await clock.advance(by: AccountDeletion.timeout - .milliseconds(1))
+                #expect(!isStallCanceled.value)
+                await clock.advance(by: .milliseconds(1))
+                await store.receive(\.deletionFailed)
+                #expect(isStallCanceled.value)
+                await clock.advance(by: .seconds(3600))
+                await store.finish()
+            }
+        }
+
+        @Test
+        func aFailedSignOutAfterAStalledRevokeFailsTheDeletion() async {
+            let clock = TestClock()
+            let store = TestStore(initialState: AccountDeletion.State(uid: AccountUser.mock.uid)) {
+                AccountDeletion()
+            } withDependencies: {
+                $0.authClient.reauthenticate = { _ in }
+                $0.authClient.revokeAppleToken = { _ in
+                    _ = await Task { try? await clock.sleep(for: .seconds(3600)) }.value
+                }
+                $0.authClient.signOut = { throw SignOutFailure() }
+                $0.continuousClock = clock
+                $0.signInWithAppleClient.requestCredential = { .mock }
+                $0.userDataClient.deleteAll = { _, didDeleteSomeData in await didDeleteSomeData() }
+            }
+
+            await store.send(.deletionConfirmed)
+            await store.receive(\.appleCredentialReceived) {
+                $0.step = .deleting
+            }
+            await store.receive(\.userDataDeleted) {
+                $0.step = .userDataDeleted
+            }
+            await store.receive(\.appleCredentialRevokeStarted) {
+                $0.step = .revokingCredential
+            }
+            await clock.advance(by: AccountDeletion.timeout)
+            await store.receive(\.deletionFailed)
+            await store.receive(\.delegate.didFail, .notSignedOut)
+            await clock.advance(by: .seconds(3600))
+            await store.finish()
+        }
+
+        @Test
+        func aRevokeWithoutAResultSignsTheUserOutWhenTheDeletionTimesOut() async {
+            let clock = TestClock()
+            await confirmation("Signs the user out") { signsOut in
+                let store = TestStore(initialState: AccountDeletion.State(uid: AccountUser.mock.uid)) {
+                    AccountDeletion()
+                } withDependencies: {
+                    $0.authClient.reauthenticate = { _ in }
+                    $0.authClient.revokeAppleToken = { _ in throw CancellationError() }
+                    $0.authClient.signOut = { signsOut() }
+                    $0.continuousClock = clock
+                    $0.signInWithAppleClient.requestCredential = { .mock }
+                    $0.userDataClient.deleteAll = { _, didDeleteSomeData in await didDeleteSomeData() }
+                }
+
+                await store.send(.deletionConfirmed)
+                await store.receive(\.appleCredentialReceived) {
+                    $0.step = .deleting
+                }
+                await store.receive(\.userDataDeleted) {
+                    $0.step = .userDataDeleted
+                }
+                await store.receive(\.appleCredentialRevokeStarted) {
+                    $0.step = .revokingCredential
+                }
+                await clock.advance(by: AccountDeletion.timeout)
+                await store.receive(\.deletionFailed)
+                await store.finish()
+            }
+        }
+
         enum StalledStep: Sendable {
             case deleteAll
             case deleteAllAfterTheFirstDeletion
             case reauthenticate
-            case revokeAppleToken
         }
 
         private struct DeletionFailure: Error {}
