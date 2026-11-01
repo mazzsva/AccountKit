@@ -1,4 +1,6 @@
 import ComposableArchitecture
+import CustomDump
+import Foundation
 import Testing
 
 @testable import AccountKit
@@ -87,6 +89,22 @@ extension BaseSuite {
                 $0.alert = nil
             }
             await store.receive(\.delegate.didConfirmAccountDeletion)
+        }
+
+        // Every failure needs its own message, because the user decides what to do next from it
+        @Test(
+            arguments: [
+                (
+                    AccountDeletion.Failure.connectionFailed,
+                    TextState("Your account couldn't be deleted. Check your connection and try again.")
+                ),
+                (.notDeleted, TextState("Your account couldn't be deleted.")),
+                (.notFullyDeleted, TextState("Your account couldn't be fully deleted.")),
+                (.notSignedOut, TextState("You couldn't be signed out.")),
+            ] as [(AccountDeletion.Failure, TextState)]
+        )
+        func anAccountDeletionFailureHasItsOwnMessage(failure: AccountDeletion.Failure, message: TextState) {
+            expectNoDifference(AlertState<AccountSettings.Alert>.accountDeletionFailed(failure).message, message)
         }
 
         private struct SignOutFailure: Error {}
