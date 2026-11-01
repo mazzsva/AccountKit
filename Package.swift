@@ -22,6 +22,7 @@ let package = Package(
     ],
     dependencies: [
         .package(url: "https://github.com/pointfreeco/swift-case-paths", from: "1.10.0"),
+        .package(url: "https://github.com/pointfreeco/swift-concurrency-extras", from: "1.4.3"),
         .package(url: "https://github.com/pointfreeco/swift-custom-dump", from: "1.7.3"),
         .package(url: "https://github.com/pointfreeco/swift-dependencies", from: "1.17.1"),
         .package(url: "https://github.com/firebase/firebase-ios-sdk", "12.15.0" ..< "13.0.0"),
@@ -36,6 +37,7 @@ let package = Package(
                 .product(name: "Dependencies", package: "swift-dependencies"),
                 .product(name: "DependenciesMacros", package: "swift-dependencies"),
                 .product(name: "FirebaseAuth", package: "firebase-ios-sdk"),
+                .product(name: "FirebaseFirestore", package: "firebase-ios-sdk"),
             ],
             swiftSettings: swiftSettings,
         ),
@@ -43,6 +45,7 @@ let package = Package(
             name: "AccountKitTests",
             dependencies: [
                 "AccountKit",
+                .product(name: "ConcurrencyExtras", package: "swift-concurrency-extras"),
                 .product(name: "CustomDump", package: "swift-custom-dump"),
                 .product(name: "DependenciesTestSupport", package: "swift-dependencies"),
             ],
