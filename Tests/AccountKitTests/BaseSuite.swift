@@ -1,4 +1,8 @@
+import DependenciesTestSupport
 import Testing
 
-@Suite(.serialized)
+@Suite(
+    .serialized,
+    .dependencies
+)
 struct BaseSuite {}
