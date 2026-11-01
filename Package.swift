@@ -18,7 +18,11 @@ let package = Package(
         .library(
             name: "AccountKit",
             targets: ["AccountKit"]
-        )
+        ),
+        .library(
+            name: "AccountKitTestSupport",
+            targets: ["AccountKitTestSupport"]
+        ),
     ],
     dependencies: [
         .package(url: "https://github.com/pointfreeco/swift-case-paths", from: "1.10.0"),
@@ -44,10 +48,23 @@ let package = Package(
             ],
             swiftSettings: swiftSettings,
         ),
+        .target(
+            name: "AccountKitTestSupport",
+            dependencies: [
+                "AccountKit",
+                .product(name: "ConcurrencyExtras", package: "swift-concurrency-extras"),
+                .product(name: "CustomDump", package: "swift-custom-dump"),
+                .product(name: "FirebaseAuth", package: "firebase-ios-sdk"),
+                .product(name: "FirebaseCore", package: "firebase-ios-sdk"),
+                .product(name: "FirebaseFirestore", package: "firebase-ios-sdk"),
+            ],
+            swiftSettings: swiftSettings,
+        ),
         .testTarget(
             name: "AccountKitTests",
             dependencies: [
                 "AccountKit",
+                "AccountKitTestSupport",
                 .product(name: "ConcurrencyExtras", package: "swift-concurrency-extras"),
                 .product(name: "CustomDump", package: "swift-custom-dump"),
                 .product(name: "DependenciesTestSupport", package: "swift-dependencies"),
