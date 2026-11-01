@@ -20,16 +20,26 @@ let package = Package(
             targets: ["AccountKit"]
         )
     ],
+    dependencies: [
+        .package(url: "https://github.com/pointfreeco/swift-case-paths", from: "1.10.0"),
+        .package(url: "https://github.com/pointfreeco/swift-custom-dump", from: "1.7.3"),
+    ],
     targets: [
         // Targets are the basic building blocks of a package, defining a module or a test suite.
         // Targets can depend on other targets in this package and products from dependencies.
         .target(
             name: "AccountKit",
+            dependencies: [
+                .product(name: "CasePaths", package: "swift-case-paths")
+            ],
             swiftSettings: swiftSettings,
         ),
         .testTarget(
             name: "AccountKitTests",
-            dependencies: ["AccountKit"],
+            dependencies: [
+                "AccountKit",
+                .product(name: "CustomDump", package: "swift-custom-dump"),
+            ],
             swiftSettings: swiftSettings,
         ),
     ]
