@@ -1,0 +1,17 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isOpen(uid) {
+      return uid != 'locked';
+    }
+
+    match /users/{uid} {
+      allow read, write: if isOpen(uid);
+
+      match /{collection}/{document} {
+        allow read, write: if isOpen(uid);
+      }
+    }
+  }
+}
