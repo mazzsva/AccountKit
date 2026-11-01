@@ -35,6 +35,7 @@ let package = Package(
             name: "AccountKit",
             dependencies: [
                 .product(name: "CasePaths", package: "swift-case-paths"),
+                .product(name: "ConcurrencyExtras", package: "swift-concurrency-extras"),
                 .product(name: "Dependencies", package: "swift-dependencies"),
                 .product(name: "DependenciesMacros", package: "swift-dependencies"),
                 .product(name: "FirebaseAuth", package: "firebase-ios-sdk"),
