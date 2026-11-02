@@ -1,5 +1,6 @@
 import ComposableArchitecture
 import Foundation
+import SwiftUI
 import os
 
 @Reducer
@@ -75,51 +76,51 @@ public struct AccountSettings: Sendable {
 extension AlertState where Action == AccountSettings.Alert {
     public static func accountDeletionFailed(_ failure: AccountDeletion.Failure) -> AlertState {
         AlertState {
-            TextState("Something Went Wrong")
+            TextState("Something Went Wrong", bundle: .module)
         } message: {
             switch failure {
             case .connectionFailed:
-                TextState("Your account couldn't be deleted. Check your connection and try again.")
+                TextState("Your account couldn't be deleted. Check your connection and try again.", bundle: .module)
             case .notDeleted:
-                TextState("Your account couldn't be deleted.")
+                TextState("Your account couldn't be deleted.", bundle: .module)
             case .notFullyDeleted:
-                TextState("Your account couldn't be fully deleted.")
+                TextState("Your account couldn't be fully deleted.", bundle: .module)
             case .notSignedOut:
-                TextState("You couldn't be signed out.")
+                TextState("You couldn't be signed out.", bundle: .module)
             }
         }
     }
 
     public static let confirmAccountDeletion = AlertState {
-        TextState("Delete Account")
+        TextState("Delete Account", bundle: .module)
     } actions: {
         ButtonState(role: .destructive, action: .confirmAccountDeletion) {
-            TextState("Delete")
+            TextState("Delete", bundle: .module)
         }
         ButtonState(role: .cancel) {
-            TextState("Cancel")
+            TextState("Cancel", bundle: .module)
         }
     } message: {
-        TextState("Your account and all your data will be permanently deleted. Are you sure?")
+        TextState("Your account and all your data will be permanently deleted. Are you sure?", bundle: .module)
     }
 
     public static let confirmSignOut = AlertState {
-        TextState("Sign Out")
+        TextState("Sign Out", bundle: .module)
     } actions: {
         ButtonState(role: .destructive, action: .confirmSignOut) {
-            TextState("Sign Out")
+            TextState("Sign Out", bundle: .module)
         }
         ButtonState(role: .cancel) {
-            TextState("Cancel")
+            TextState("Cancel", bundle: .module)
         }
     } message: {
-        TextState("Are you sure you want to sign out?")
+        TextState("Are you sure you want to sign out?", bundle: .module)
     }
 
     public static let signOutFailed = AlertState {
-        TextState("Something Went Wrong")
+        TextState("Something Went Wrong", bundle: .module)
     } message: {
-        TextState("You couldn't be signed out.")
+        TextState("You couldn't be signed out.", bundle: .module)
     }
 }
 
