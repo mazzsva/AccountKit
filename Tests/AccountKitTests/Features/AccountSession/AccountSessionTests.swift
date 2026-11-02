@@ -99,6 +99,72 @@ extension BaseSuite {
             }
         }
 
+        // The welcome must not cover the loading screen at launch
+        @Test
+        func theWelcomeIsPresentedOnlyOnceTheAppIsReady() {
+            var state = AccountSession<Home>.State()
+            #expect(!state.isPresentingWelcome)
+
+            state.scene = .signIn(SignIn.State())
+            #expect(state.isPresentingWelcome)
+
+            state.$hasDismissedWelcome.withLock { $0 = true }
+            #expect(!state.isPresentingWelcome)
+        }
+
+        // App storage keeps the flag, so the welcome does not return at the next launch
+        @Test
+        func theWelcomeContinueButtonDismissesItForGood() async {
+            var state = AccountSession<Home>.State()
+            state.scene = .signIn(SignIn.State())
+
+            let store = TestStore(initialState: state) {
+                AccountSession<Home>()
+            }
+
+            await store.send(.welcomeContinueButtonTapped) {
+                $0.$hasDismissedWelcome.withLock { $0 = true }
+            }
+            #expect(!store.state.isPresentingWelcome)
+        }
+
+        @Test
+        func theWelcomeDismissedBySwiftUIIsDismissedForGood() async {
+            var state = AccountSession<Home>.State()
+            state.scene = .signIn(SignIn.State())
+
+            let store = TestStore(initialState: state) {
+                AccountSession<Home>()
+            }
+
+            await store.send(.welcomePresentationChanged(true))
+            await store.send(.welcomePresentationChanged(false)) {
+                $0.$hasDismissedWelcome.withLock { $0 = true }
+            }
+            #expect(!store.state.isPresentingWelcome)
+        }
+
+        #if DEBUG
+        @Test
+        func theDebugFlagBringsTheWelcomeBackAtLaunch() async {
+            @Shared(.hasDismissedWelcome) var hasDismissedWelcome = true
+            @Shared(.showsWelcomeAtNextLaunch) var showsWelcomeAtNextLaunch = true
+
+            let store = TestStore(initialState: AccountSession<Home>.State()) {
+                AccountSession<Home>()
+            } withDependencies: {
+                $0.authClient.authStateChanges = { AsyncStream { $0.finish() } }
+                $0.signInWithAppleClient.credentialRevocations = { AsyncStream { $0.finish() } }
+            }
+
+            await store.send(.task) {
+                $0.$hasDismissedWelcome.withLock { $0 = false }
+                $0.$showsWelcomeAtNextLaunch.withLock { $0 = false }
+            }
+            await store.finish()
+        }
+        #endif
+
         // Firebase reports no user while the sign in is in progress
         @Test
         func aSignedOutUserOnTheSignInIsIgnored() async {
