@@ -13,7 +13,7 @@ public struct SignIn: Sendable {
 
     @ObservableState
     public struct State: Equatable, Sendable {
-        @Presents public var alert: AlertState<SignIn.Alert>?
+        @Presents public internal(set) var alert: AlertState<SignIn.Alert>?
         public var step: Step?
 
         public var isAuthenticating: Bool { step != nil }
