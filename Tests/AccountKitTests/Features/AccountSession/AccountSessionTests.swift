@@ -336,6 +336,76 @@ extension BaseSuite {
             }
         }
 
+        // The reason follows the step in progress, and a system sheet gets none
+        @Test
+        func theLoadingReasonDescribesWhatTheAppIsDoing() {
+            var state = AccountSession<Home>.State()
+            #expect(state.isLoading)
+            expectNoDifference(state.loadingReason, nil)
+
+            var signIn = SignIn.State()
+            signIn.step = .signingIn
+            state.scene = .signIn(signIn)
+            #expect(state.isLoading)
+            expectNoDifference(state.loadingReason, .signingIn)
+
+            var home = Home.State(user: .mock)
+            home.accountDeletion = AccountDeletion.State(step: .reauthenticating, uid: AccountUser.mock.uid)
+            state.scene = .home(home)
+            #expect(state.isLoading)
+            expectNoDifference(state.loadingReason, nil)
+
+            state.scene?.modify(\.home) { $0.accountDeletion?.step = .deleting }
+            expectNoDifference(state.loadingReason, .deletingAccount)
+
+            state.scene = .home(
+                Home.State(user: .mock, sessionOrigin: .freshSignIn)
+            )
+            #expect(state.isLoading)
+            expectNoDifference(state.loadingReason, .signingIn)
+
+            signIn.step = .awaitingAuthorization
+            state.scene = .signIn(signIn)
+            #expect(state.isLoading)
+            expectNoDifference(state.loadingReason, nil)
+        }
+
+        // The Apple sheet covers the app, so the reason waits for the deletion to start
+        @Test
+        func theLoadingReasonAppearsOnceTheAccountDeletionStarts() async {
+            var state = AccountSession<Home>.State()
+            state.scene = .home(Home.State(user: .mock))
+
+            let store = TestStore(initialState: state) {
+                AccountSession<Home>()
+            } withDependencies: {
+                $0.authClient.appleUserID = { nil }
+                $0.authClient.reauthenticate = { _ in try await Task.never() }
+                $0.continuousClock = TestClock()
+                $0.signInWithAppleClient.requestCredential = { .mock }
+            }
+
+            await store.send(\.scene.home.settings.deleteAccountButtonTapped) {
+                $0.scene?.modify(\.home) { $0.settings.alert = .confirmAccountDeletion }
+            }
+            await store.send(.scene(.home(.settings(.alert(.presented(.confirmAccountDeletion)))))) {
+                $0.scene?.modify(\.home) { $0.settings.alert = nil }
+            }
+            await store.receive(\.scene.home.settings.delegate.didConfirmAccountDeletion) {
+                $0.scene?.modify(\.home) { $0.accountDeletion = AccountDeletion.State(uid: AccountUser.mock.uid) }
+            }
+            await store.receive(\.scene.home.accountDeletion.presented.deletionConfirmed)
+            expectNoDifference(store.state.loadingReason, nil)
+
+            await store.receive(\.scene.home.accountDeletion.presented.appleCredentialReceived) {
+                $0.scene?.modify(\.home) { $0.accountDeletion?.step = .deleting }
+            }
+            expectNoDifference(store.state.loadingReason, .deletingAccount)
+            await store.send(\.scene.home.accountDeletion.dismiss) {
+                $0.scene?.modify(\.home) { $0.accountDeletion = nil }
+            }
+        }
+
         // Auth must not change accounts without a sign out, so the app also reports an issue
         @Test
         func switchingAccountsRestartsTheSession() async {
@@ -412,17 +482,20 @@ extension BaseSuite {
                 await store.send(.authUserChanged(nil)) {
                     $0.isSignedOutSettling = true
                 }
+                #expect(store.state.isLoading)
                 #expect(store.state.scene.is(\.home))
 
                 await clock.advance(by: AccountSession<Home>.signedOutCoverDelay)
                 await store.receive(\.signedOutCoverTimerElapsed) {
                     $0.scene = .signIn(SignIn.State())
                 }
+                #expect(store.state.isLoading)
 
                 await clock.advance(by: AccountSession<Home>.signedOutSettleDelay)
                 await store.receive(\.signedOutSettleTimerElapsed) {
                     $0.isSignedOutSettling = false
                 }
+                #expect(!store.state.isLoading)
                 await store.finish()
             }
         }
