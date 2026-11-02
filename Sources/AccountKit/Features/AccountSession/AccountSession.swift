@@ -24,6 +24,32 @@ public struct AccountSession<Content: SignedInFeature>: Sendable {
         var hasLiveSession: Bool { scene.is(\.home) && !isDeletingAccount && !isSignedOutSettling }
 
         var isDeletingAccount: Bool { scene?.home?.isDeletingAccount ?? false }
+
+        public var isLoading: Bool {
+            switch scene {
+            case nil:
+                return true
+            case .home(let home):
+                return isDeletingAccount || home.isLoadingFirstContent || isSignedOutSettling
+            case .signIn(let signIn):
+                return isSignedOutSettling || signIn.isAuthenticating
+            }
+        }
+
+        public var loadingReason: SessionLoadingReason? {
+            switch scene {
+            case .home(let home) where home.isDeletingAccount && !home.isReauthenticating:
+                return .deletingAccount
+            case .home(let home) where home.isLoadingFirstContent:
+                guard home.sessionOrigin == .freshSignIn else { return nil }
+                return .signingIn
+            case .signIn(let signIn):
+                guard signIn.step == .signingIn else { return nil }
+                return .signingIn
+            case nil, .home:
+                return nil
+            }
+        }
     }
 
     public enum Action {
