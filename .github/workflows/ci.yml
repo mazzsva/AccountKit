@@ -25,6 +25,34 @@ jobs:
       - name: Check out the repository
         uses: actions/checkout@v7
 
+      - name: Check whether the integration tests need to run
+        id: integration
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          EVENT_NAME: ${{ github.event_name }}
+        run: |
+          run=true
+          if [ "$EVENT_NAME" = pull_request ] \
+            && git fetch --no-tags --depth=1 origin "$BASE_SHA" \
+            && changed=$(git diff --name-only --no-renames "$BASE_SHA" HEAD); then
+            printf '%s\n' "$changed"
+            printf '%s\n' "$changed" | grep -q -E \
+              -e '^Sources/AccountKit/Storage/' \
+              -e '^Sources/AccountKit/Models/ProfileSnapshot\.swift$' \
+              -e '^Sources/AccountKitTestSupport/' \
+              -e '^Tests/AccountKitTests/BaseSuite\.swift$' \
+              -e '^Tests/AccountKitTests/Integration/' \
+              -e '^firebase\.json$' \
+              -e '^firestore\.rules$' \
+              -e '^scripts/test-integration\.sh$' \
+              -e '^Package\.swift$' \
+              -e '^Package\.resolved$' \
+              -e '^\.github/workflows/ci\.yml$' \
+              -e '^\.swiftpm/xcode/xcshareddata/xcschemes/' \
+              || run=false
+          fi
+          echo "run=$run" | tee -a "$GITHUB_OUTPUT"
+
       - name: Report the toolchain
         run: |
           xcodebuild -version
@@ -67,6 +95,7 @@ jobs:
             -resultBundlePath TestResults.xcresult
 
       - name: Install the Firebase emulators
+        if: steps.integration.outputs.run == 'true'
         env:
           HOMEBREW_NO_AUTO_UPDATE: 1
         run: |
@@ -74,6 +103,7 @@ jobs:
           npm install --global firebase-tools@15
 
       - name: Run the integration tests
+        if: steps.integration.outputs.run == 'true'
         timeout-minutes: 10
         run: |
           DESTINATION="platform=iOS Simulator,id=$SIMULATOR_UDID" scripts/test-integration.sh \
@@ -83,6 +113,7 @@ jobs:
             -resultBundlePath IntegrationResults.xcresult
 
       - name: Check that the integration tests ran
+        if: steps.integration.outputs.run == 'true'
         run: |
           xcrun xcresulttool get test-results summary --path IntegrationResults.xcresult --compact \
             | jq -e '.passedTests > 0 and .skippedTests == 0'
