@@ -1,0 +1,217 @@
+import ComposableArchitecture
+import Foundation
+import IssueReporting
+import os
+
+@Reducer
+public struct AccountSession<Content: SignedInFeature>: Sendable {
+    @Reducer
+    public enum Scene {
+        case home(Content)
+        case signIn(SignIn)
+    }
+
+    @ObservableState
+    public struct State {
+        public var isSignedOutSettling = false
+        public var scene: Scene.State?
+
+        public init(isSignedOutSettling: Bool = false, scene: Scene.State? = nil) {
+            self.isSignedOutSettling = isSignedOutSettling
+            self.scene = scene
+        }
+
+        var hasLiveSession: Bool { scene.is(\.home) && !isDeletingAccount && !isSignedOutSettling }
+
+        var isDeletingAccount: Bool { scene?.home?.isDeletingAccount ?? false }
+    }
+
+    public enum Action {
+        case appBecameActive
+        case appleCredentialRevoked
+        case authUserChanged(AccountUser?)
+        case scene(Scene.Action)
+        case signedOutCoverTimerElapsed
+        case signedOutSettleTimerElapsed
+        case task
+    }
+
+    enum CancelID {
+        case appleCredentialCheck
+        case authObservation
+        case credentialRevocationObservation
+        case signedOutSettle
+    }
+
+    static var signedOutCoverDelay: Duration { .milliseconds(300) }
+    static var signedOutSettleDelay: Duration { .milliseconds(500) }
+
+    @Dependency(\.authClient) var authClient
+    @Dependency(\.continuousClock) var clock
+    @Dependency(\.signInWithAppleClient) var signInWithAppleClient
+
+    public init() {}
+
+    public var body: some Reducer<State, Action> {
+        Reduce { state, action in
+            switch action {
+            case .appBecameActive:
+                guard state.hasLiveSession else { return .none }
+                return verifyAppleCredential()
+
+            case .appleCredentialRevoked:
+                guard state.hasLiveSession else { return .none }
+                logger.notice("Apple ID credential was revoked; signing out.")
+                return .run { _ in
+                    try await authClient.signOut()
+                } catch: { error, _ in
+                    logger.error("Sign out after Apple ID credential revocation failed: \(error, privacy: .public)")
+                }
+
+            case .authUserChanged(let user):
+                return resolveAuthChange(&state, user: user)
+
+            case .scene:
+                return .none
+
+            case .signedOutCoverTimerElapsed:
+                guard state.isSignedOutSettling, state.scene.is(\.home) else { return .none }
+                state.scene = .signIn(SignIn.State())
+                return clearLocalData()
+
+            case .signedOutSettleTimerElapsed:
+                state.isSignedOutSettling = false
+                return .none
+
+            case .task:
+                return .merge(
+                    observeAuthChanges(),
+                    observeCredentialRevocations()
+                )
+            }
+        }
+        .ifLet(\.scene, action: \.scene) {
+            Scene.body
+                .dependency(
+                    \.signedInUserDataClient,
+                    UserDataClient { try await Content.deleteUserData(uid: $0, didDeleteSomeData: $1) }
+                )
+        }
+        .onChange(of: \.isDeletingAccount) { wasDeletingAccount, isDeletingAccount in
+            Reduce { state, _ in
+                guard wasDeletingAccount, !isDeletingAccount, state.hasLiveSession else { return .none }
+                return verifyAppleCredential()
+            }
+        }
+    }
+
+    private func clearLocalData() -> Effect<Action> {
+        .run { _ in
+            try await Content.clearLocalData()
+        } catch: { error, _ in
+            logger.error("Clearing the local data failed: \(error, privacy: .public)")
+            reportIssue(error, "Clearing the local data failed.")
+        }
+    }
+
+    private func observeAuthChanges() -> Effect<Action> {
+        .run { send in
+            for await user in authClient.authStateChanges() {
+                await send(.authUserChanged(user))
+            }
+        }
+        .cancellable(id: CancelID.authObservation, cancelInFlight: true)
+    }
+
+    private func observeCredentialRevocations() -> Effect<Action> {
+        .run { send in
+            for await _ in signInWithAppleClient.credentialRevocations() {
+                await send(.appleCredentialRevoked)
+            }
+        }
+        .cancellable(id: CancelID.credentialRevocationObservation, cancelInFlight: true)
+    }
+
+    private func resolveAuthChange(_ state: inout State, user: AccountUser?) -> Effect<Action> {
+        switch (state.scene, user) {
+        case (nil, nil):
+            state.scene = .signIn(SignIn.State())
+            return clearLocalData()
+
+        case (nil, .some(let user)):
+            state.scene = .home(Content.State(user: user, sessionOrigin: .restored))
+            return verifyAppleCredential()
+
+        case (.signIn(let signIn), .some(let user)):
+            let isFreshSignIn = signIn.isAuthenticating
+            state.scene = .home(
+                Content.State(user: user, sessionOrigin: isFreshSignIn ? .freshSignIn : .restored)
+            )
+            return isFreshSignIn ? .none : verifyAppleCredential()
+
+        case (.signIn, nil):
+            return .none
+
+        case (.home(let home), .some(let user)) where home.user.uid == user.uid:
+            return .none
+
+        case (.home, .some):
+            logger.notice("Auth changed accounts without signing out first; ending the session before the new one.")
+            reportIssue("Auth changed accounts without signing out first.")
+            state.isSignedOutSettling = false
+            state.scene = nil
+            return .concatenate(
+                .merge(.cancel(id: CancelID.appleCredentialCheck), .cancel(id: CancelID.signedOutSettle)),
+                clearLocalData(),
+                .run { send in await send(.authUserChanged(authClient.currentUser())) }
+            )
+
+        case (.home, nil):
+            state.isSignedOutSettling = true
+            return .merge(
+                .cancel(id: CancelID.appleCredentialCheck),
+                settleSignOut()
+            )
+        }
+    }
+
+    private func settleSignOut() -> Effect<Action> {
+        .run { send in
+            try await clock.sleep(for: Self.signedOutCoverDelay)
+            await send(.signedOutCoverTimerElapsed)
+            try await clock.sleep(for: Self.signedOutSettleDelay)
+            await send(.signedOutSettleTimerElapsed)
+        }
+        .cancellable(id: CancelID.signedOutSettle, cancelInFlight: true)
+    }
+
+    private func verifyAppleCredential() -> Effect<Action> {
+        .run { send in
+            guard let appleUserID = authClient.appleUserID() else { return }
+            let credentialState = await signInWithAppleClient.credentialState(userID: appleUserID)
+            guard credentialState == .revoked else {
+                if credentialState != .authorized {
+                    logger.notice(
+                        "Apple ID credential is \(credentialState.description, privacy: .public); keeping the session.")
+                }
+                return
+            }
+            await send(.appleCredentialRevoked)
+        }
+        .cancellable(id: CancelID.appleCredentialCheck, cancelInFlight: true)
+    }
+}
+
+extension AccountSession.Scene.State: Equatable where Content.State: Equatable {}
+
+extension AccountSession.Scene.State: Sendable where Content.State: Sendable {}
+
+extension AccountSession.Scene.Action: Sendable where Content.Action: Sendable {}
+
+extension AccountSession.State: Equatable where Content.State: Equatable {}
+
+extension AccountSession.State: Sendable where Content.State: Sendable {}
+
+extension AccountSession.Action: Sendable where Content.Action: Sendable {}
+
+private let logger = Logger(category: "AppFeature")

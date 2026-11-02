@@ -18,7 +18,7 @@ extension BaseSuite {
         }
 
         @Test
-        func theLiveValueFailsUntilTheAppSetsIt() async {
+        func theLiveValueFailsOutsideAnAccountSession() async {
             let deletions = LockIsolated(0)
 
             await withKnownIssue {
