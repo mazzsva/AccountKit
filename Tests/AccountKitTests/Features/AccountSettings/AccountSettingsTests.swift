@@ -107,6 +107,12 @@ extension BaseSuite {
             expectNoDifference(AlertState<AccountSettings.Alert>.accountDeletionFailed(failure).message, message)
         }
 
+        @Test
+        func thePackageBundleHasTheAlertStrings() {
+            let key = "Are you sure you want to sign out?"
+            expectNoDifference(Bundle.module.localizedString(forKey: key, value: "Missing", table: nil), key)
+        }
+
         private struct SignOutFailure: Error {}
     }
 }

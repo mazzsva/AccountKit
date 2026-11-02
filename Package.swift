@@ -10,6 +10,7 @@ let swiftSettings: [SwiftSetting] = [
 
 let package = Package(
     name: "AccountKit",
+    defaultLocalization: "en",
     platforms: [
         .iOS(.v27)
     ],
@@ -47,6 +48,9 @@ let package = Package(
                 .product(name: "FirebaseAuth", package: "firebase-ios-sdk"),
                 .product(name: "FirebaseFirestore", package: "firebase-ios-sdk"),
                 .product(name: "IssueReporting", package: "swift-issue-reporting"),
+            ],
+            resources: [
+                .process("Localizable.xcstrings")
             ],
             swiftSettings: swiftSettings,
         ),

@@ -1,5 +1,6 @@
 import ComposableArchitecture
 import Foundation
+import SwiftUI
 import os
 
 @Reducer
@@ -78,9 +79,9 @@ public struct SignIn: Sendable {
 
 extension AlertState where Action == SignIn.Alert {
     public static let signInFailed = AlertState {
-        TextState("Something Went Wrong")
+        TextState("Something Went Wrong", bundle: .module)
     } message: {
-        TextState("You couldn't be signed in.")
+        TextState("You couldn't be signed in.", bundle: .module)
     }
 }
 
