@@ -13,8 +13,12 @@ public struct AccountSession<Content: SignedInFeature>: Sendable {
 
     @ObservableState
     public struct State {
+        @Shared(.hasDismissedWelcome) var hasDismissedWelcome
         public var isSignedOutSettling = false
         public var scene: Scene.State?
+        #if DEBUG
+        @Shared(.showsWelcomeAtNextLaunch) var showsWelcomeAtNextLaunch
+        #endif
 
         public init(isSignedOutSettling: Bool = false, scene: Scene.State? = nil) {
             self.isSignedOutSettling = isSignedOutSettling
@@ -34,6 +38,10 @@ public struct AccountSession<Content: SignedInFeature>: Sendable {
             case .signIn(let signIn):
                 return isSignedOutSettling || signIn.isAuthenticating
             }
+        }
+
+        public var isPresentingWelcome: Bool {
+            !hasDismissedWelcome && !isLoading
         }
 
         public var loadingReason: SessionLoadingReason? {
@@ -60,6 +68,8 @@ public struct AccountSession<Content: SignedInFeature>: Sendable {
         case signedOutCoverTimerElapsed
         case signedOutSettleTimerElapsed
         case task
+        case welcomeContinueButtonTapped
+        case welcomePresentationChanged(Bool)
     }
 
     enum CancelID {
@@ -110,10 +120,23 @@ public struct AccountSession<Content: SignedInFeature>: Sendable {
                 return .none
 
             case .task:
+                #if DEBUG
+                if state.showsWelcomeAtNextLaunch {
+                    state.$showsWelcomeAtNextLaunch.withLock { $0 = false }
+                    state.$hasDismissedWelcome.withLock { $0 = false }
+                }
+                #endif
                 return .merge(
                     observeAuthChanges(),
                     observeCredentialRevocations()
                 )
+
+            case .welcomeContinueButtonTapped, .welcomePresentationChanged(false):
+                state.$hasDismissedWelcome.withLock { $0 = true }
+                return .none
+
+            case .welcomePresentationChanged(true):
+                return .none
             }
         }
         .ifLet(\.scene, action: \.scene) {
