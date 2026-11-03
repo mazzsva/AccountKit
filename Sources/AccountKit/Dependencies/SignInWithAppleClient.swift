@@ -39,7 +39,7 @@ extension SignInWithAppleClient: DependencyKey {
                                 logger.error(
                                     "Reading the Apple ID credential state failed: \(error, privacy: .public)")
                             }
-                            continuation.resume(returning: appleCredentialState(from: state, error: error))
+                            continuation.resume(returning: appleCredentialState(from: state))
                         }
                 }
             },
@@ -89,11 +89,7 @@ extension Error {
     }
 }
 
-func appleCredentialState(
-    from state: ASAuthorizationAppleIDProvider.CredentialState,
-    error: (any Error)?
-) -> AppleCredentialState {
-    guard error == nil else { return .unknown }
+func appleCredentialState(from state: ASAuthorizationAppleIDProvider.CredentialState) -> AppleCredentialState {
     switch state {
     case .authorized:
         return .authorized

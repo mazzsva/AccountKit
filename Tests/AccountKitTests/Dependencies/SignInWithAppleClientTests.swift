@@ -25,23 +25,11 @@ extension BaseSuite {
                 (.transferred, .transferred),
             ]
         )
-        func eachCredentialStateWithoutAnErrorKeepsItsCase(
+        func eachCredentialStateKeepsItsCase(
             state: ASAuthorizationAppleIDProvider.CredentialState,
             expected: AppleCredentialState
         ) {
-            expectNoDifference(appleCredentialState(from: state, error: nil), expected)
-        }
-
-        @Test(
-            arguments: [
-                ASAuthorizationAppleIDProvider.CredentialState.authorized,
-                .notFound,
-                .revoked,
-                .transferred,
-            ]
-        )
-        func aCredentialStateWithAnErrorIsUnknown(state: ASAuthorizationAppleIDProvider.CredentialState) {
-            expectNoDifference(appleCredentialState(from: state, error: ASAuthorizationError(.failed)), .unknown)
+            expectNoDifference(appleCredentialState(from: state), expected)
         }
 
         @Test
