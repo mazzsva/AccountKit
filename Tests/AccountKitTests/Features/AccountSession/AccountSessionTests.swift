@@ -354,9 +354,6 @@ extension BaseSuite {
                 await store.receive(\.scene.home.accountDeletion.presented.userDataDeleted) {
                     $0.scene?.modify(\.home) { $0.accountDeletion?.step = .userDataDeleted }
                 }
-                await store.receive(\.scene.home.accountDeletion.presented.appleCredentialRevokeStarted) {
-                    $0.scene?.modify(\.home) { $0.accountDeletion?.step = .revokingCredential }
-                }
                 await store.send(\.scene.home.accountDeletion.dismiss) {
                     $0.scene?.modify(\.home) { $0.accountDeletion = nil }
                 }
@@ -391,9 +388,6 @@ extension BaseSuite {
                 }
                 await store.receive(\.scene.home.accountDeletion.presented.userDataDeleted) {
                     $0.scene?.modify(\.home) { $0.accountDeletion?.step = .userDataDeleted }
-                }
-                await store.receive(\.scene.home.accountDeletion.presented.appleCredentialRevokeStarted) {
-                    $0.scene?.modify(\.home) { $0.accountDeletion?.step = .revokingCredential }
                 }
                 await store.send(\.scene.home.accountDeletion.dismiss) {
                     $0.scene?.modify(\.home) { $0.accountDeletion = nil }
