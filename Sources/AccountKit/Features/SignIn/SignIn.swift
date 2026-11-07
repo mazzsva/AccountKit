@@ -19,8 +19,7 @@ public struct SignIn: Sendable {
 
         public var isAuthenticating: Bool { step != nil }
 
-        public init(alert: AlertState<SignIn.Alert>? = nil, step: Step? = nil) {
-            self.alert = alert
+        public init(step: Step? = nil) {
             self.step = step
         }
     }
@@ -78,7 +77,7 @@ public struct SignIn: Sendable {
 }
 
 extension AlertState where Action == SignIn.Alert {
-    public static let signInFailed = AlertState {
+    static let signInFailed = AlertState {
         TextState("Something Went Wrong", bundle: .module)
     } message: {
         TextState("You couldn't be signed in.", bundle: .module)

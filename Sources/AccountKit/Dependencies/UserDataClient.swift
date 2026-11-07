@@ -3,13 +3,12 @@ import DependenciesMacros
 import IssueReporting
 
 @DependencyClient
-public struct UserDataClient: Sendable {
-    public var deleteAll:
-        @Sendable (_ uid: String, _ didDeleteSomeData: @Sendable () async -> Void) async throws -> Void
+struct UserDataClient: Sendable {
+    var deleteAll: @Sendable (_ uid: String, _ didDeleteSomeData: @Sendable () async -> Void) async throws -> Void
 }
 
 extension UserDataClient: DependencyKey {
-    public static var liveValue: UserDataClient {
+    static var liveValue: UserDataClient {
         UserDataClient(
             deleteAll: { uid, didDeleteSomeData in
                 @Dependency(\.signedInUserDataClient) var signedInUserDataClient
@@ -23,17 +22,17 @@ extension UserDataClient: DependencyKey {
         )
     }
 
-    public static var previewValue: UserDataClient {
+    static var previewValue: UserDataClient {
         UserDataClient(deleteAll: { _, _ in })
     }
 
-    public static var testValue: UserDataClient {
+    static var testValue: UserDataClient {
         UserDataClient()
     }
 }
 
 extension DependencyValues {
-    public var userDataClient: UserDataClient {
+    var userDataClient: UserDataClient {
         get { self[UserDataClient.self] }
         set { self[UserDataClient.self] = newValue }
     }
