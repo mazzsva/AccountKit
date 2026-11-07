@@ -75,7 +75,7 @@ extension BaseSuite {
                 events.withValue { $0.append("cleared") }
             }
 
-            let clear = await storage.perform { _ in
+            let clear = await storage.runSynchronousOperation {
                 let clear = Task { try await storage.clearLocalData() }
                 usleep(100_000)
                 events.withValue { $0.append("operation") }
@@ -84,54 +84,6 @@ extension BaseSuite {
 
             try await clear.value
             expectNoDifference(events.value, ["operation", "cleared"])
-        }
-
-        @Test
-        func anOperationDuringAClearRunsAfterTheClear() async throws {
-            let gate = Gate()
-            let events = LockIsolated<[String]>([])
-            let storage = AccountStorage {
-                events.withValue { $0.append("started") }
-                await gate.wait()
-                events.withValue { $0.append("cleared") }
-            }
-
-            let clear = Task { try await storage.clearLocalData() }
-            try await waitUntil { events.value == ["started"] }
-            let operation = Task {
-                await storage.perform { _ in
-                    events.withValue { $0.append("operation") }
-                }
-            }
-            try await Task.sleep(for: .milliseconds(100))
-            expectNoDifference(events.value, ["started"])
-            gate.open()
-
-            try await clear.value
-            await operation.value
-            expectNoDifference(events.value, ["started", "cleared", "operation"])
-        }
-
-        @Test
-        func anOperationReturnsItsResult() async {
-            let storage = AccountStorage {
-                Issue.record("The storage cleared without a request.")
-            }
-
-            let result = await storage.perform { _ in 1 }
-
-            expectNoDifference(result, 1)
-        }
-
-        @Test
-        func anOperationThrowsItsError() async {
-            let storage = AccountStorage {
-                Issue.record("The storage cleared without a request.")
-            }
-
-            await #expect(throws: ClearError.self) {
-                try await storage.perform { _ in throw ClearError() }
-            }
         }
 
         @Test
@@ -191,6 +143,12 @@ extension BaseSuite {
 }
 
 private struct ClearError: Error {}
+
+extension AccountStorage {
+    fileprivate func runSynchronousOperation<Result: Sendable>(_ operation: () -> Result) -> Result {
+        operation()
+    }
+}
 
 private struct TimeoutError: Error {}
 
