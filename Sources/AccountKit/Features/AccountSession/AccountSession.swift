@@ -16,9 +16,6 @@ public struct AccountSession<Content: SignedInFeature>: Sendable {
         @Shared(.hasDismissedWelcome) var hasDismissedWelcome
         public var isSignedOutSettling = false
         public var scene: Scene.State?
-        #if DEBUG
-        @Shared(.showsWelcomeAtNextLaunch) var showsWelcomeAtNextLaunch
-        #endif
 
         public init(isSignedOutSettling: Bool = false, scene: Scene.State? = nil) {
             self.isSignedOutSettling = isSignedOutSettling
@@ -120,12 +117,6 @@ public struct AccountSession<Content: SignedInFeature>: Sendable {
                 return .none
 
             case .task:
-                #if DEBUG
-                if state.showsWelcomeAtNextLaunch {
-                    state.$showsWelcomeAtNextLaunch.withLock { $0 = false }
-                    state.$hasDismissedWelcome.withLock { $0 = false }
-                }
-                #endif
                 return .merge(
                     observeAuthChanges(),
                     observeCredentialRevocations()
