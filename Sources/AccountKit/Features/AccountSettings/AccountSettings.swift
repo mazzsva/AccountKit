@@ -124,4 +124,4 @@ extension AlertState where Action == AccountSettings.Alert {
     }
 }
 
-private let logger = Logger(category: "Settings")
+private let logger = Logger(category: "AccountSettings")

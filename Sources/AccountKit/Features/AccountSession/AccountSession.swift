@@ -263,4 +263,4 @@ extension AccountSession.State: Sendable where Content.State: Sendable {}
 
 extension AccountSession.Action: Sendable where Content.Action: Sendable {}
 
-private let logger = Logger(category: "AppFeature")
+private let logger = Logger(category: "AccountSession")
