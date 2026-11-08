@@ -6,7 +6,7 @@ import Foundation
 import Testing
 
 public enum FirebaseEmulators {
-    public static let isAvailable = ProcessInfo.processInfo.environment["FIREBASE_EMULATORS"] == "1"
+    static let isAvailable = ProcessInfo.processInfo.environment["FIREBASE_EMULATORS"] == "1"
 
     private static let configuredProjectID = LockIsolated<String?>(nil)
     private static let settingsLock = NSLock()
