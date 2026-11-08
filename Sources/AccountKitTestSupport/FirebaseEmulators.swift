@@ -12,17 +12,6 @@ public enum FirebaseEmulators {
     private static let configuredProjectID = LockIsolated<String?>(nil)
     private static let settingsLock = NSLock()
 
-    public static func signOut() throws {
-        try Auth.auth().signOut()
-    }
-
-    public static func signIn() async throws -> String {
-        guard configuredProjectID.value != nil else { throw MissingTraitError() }
-        try? Auth.auth().signOut()
-        try await clearLocalData()
-        return try await Auth.auth().signInAnonymously().user.uid
-    }
-
     public static func clearLocalData() async throws {
         guard configuredProjectID.value != nil else { throw MissingTraitError() }
         try await AccountStorage.shared.clearLocalData()

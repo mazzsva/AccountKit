@@ -19,11 +19,7 @@ let package = Package(
         .library(
             name: "AccountKit",
             targets: ["AccountKit"]
-        ),
-        .library(
-            name: "AccountKitTestSupport",
-            targets: ["AccountKitTestSupport"]
-        ),
+        )
     ],
     dependencies: [
         .package(url: "https://github.com/pointfreeco/swift-case-paths", from: "1.10.0"),
