@@ -56,7 +56,6 @@ let package = Package(
                 "AccountKit",
                 .product(name: "ConcurrencyExtras", package: "swift-concurrency-extras"),
                 .product(name: "CustomDump", package: "swift-custom-dump"),
-                .product(name: "FirebaseAuth", package: "firebase-ios-sdk"),
                 .product(name: "FirebaseCore", package: "firebase-ios-sdk"),
                 .product(name: "FirebaseFirestore", package: "firebase-ios-sdk"),
             ],

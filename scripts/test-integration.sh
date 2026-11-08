@@ -15,4 +15,4 @@ command=(
     "$@"
 )
 
-firebase emulators:exec --project demo-accountkit --only auth,firestore "${(j: :)${(q)command[@]}}"
+firebase emulators:exec --project demo-accountkit --only firestore "${(j: :)${(q)command[@]}}"
