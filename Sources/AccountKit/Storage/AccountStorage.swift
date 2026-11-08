@@ -54,13 +54,6 @@ public actor AccountStorage {
         }
     }
 
-    public func perform<Result: Sendable>(
-        _ operation: @Sendable (isolated AccountStorage) async throws -> Result
-    ) async rethrows -> Result {
-        await waitForClearing()
-        return try await operation(self)
-    }
-
     public func waitForClearing() async {
         _ = try? await clearing?.value
     }
